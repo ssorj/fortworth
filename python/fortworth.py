@@ -43,19 +43,20 @@ def http_put_json(url, data):
         write_json(f, data)
         call("curl -f -X PUT -H 'Expect:' {0} -d @{1}", url, f)
 
-_file_service_url = "http://192.168.86.27:7070"
+_file_service_host = "192.168.86.27"
+_file_service_url = "http://{0}:7070".format(_file_service_host)
 _tag_service_url = "http://192.168.86.27:9090"
 
 _yum_repo_template = """
-[{build_repo}-{build_id}]
-name={build_repo}-{build_id}
+[{build_repo}/{build_tag}/{build_id}]
+name={build_repo}/{build_tag}/{build_id}
 baseurl={file_repo_url}
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 
-# Repo install command:
-# curl {file_repo_url}/{build_repo}.repo -o /etc/yum.repos.d/{build_repo}.repo
+# Yum repo install command:
+# curl {file_repo_url}/config.txt -o /etc/yum.repos.d/{build_repo}.repo
 #
 # Build URL:
 # {build_url}
@@ -69,12 +70,12 @@ def stagger_put_tag(build_repo, build_tag, tag_data):
     url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, build_repo, build_tag)
     http_put_json(url, tag_data)
 
-def rpm_make_yum_repo_config(build_repo, build_id, build_url):
-    file_repo_url = "{0}/{1}/{2}".format(_file_service_url, build_repo, build_id)
+def rpm_make_yum_repo_config(build_repo, build_tag, build_id, build_url):
+    file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
     return _yum_repo_template.lstrip().format(**locals())
 
-def rpm_make_tag(spec_file, build_repo, build_id, build_url):
-    file_repo_url = "{0}/{1}/{2}".format(_file_service_url, build_repo, build_id)
+def rpm_make_tag(spec_file, build_repo, build_tag, build_id, build_url):
+    file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
     records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}",
                               spec_file)
     artifacts = dict()
@@ -106,7 +107,7 @@ def rpm_install_tag_packages(build_repo, build_tag, *packages):
 
     for package in packages:
         yum_repo_url = tag_data["artifacts"][package]["repository_url"]
-        url = "{0}/{1}.repo".format(yum_repo_url, build_repo)
+        url = "{0}/config.txt".format(yum_repo_url)
 
         http_get(url, "/etc/yum.repos.d/{0}.repo".format(build_repo))
 
@@ -129,19 +130,26 @@ def rpm_build(spec_file, source_dir, build_dir, build_id):
 
     call("rpmbuild -D '_topdir {0}' -ba {1}", absolute_path(build_dir), spec_file)
 
+# Requires /root/keys/files.key
 def rpm_publish(spec_file, build_dir, build_repo, build_tag, build_id, build_url):
     rpms_dir = join(build_dir, "RPMS")
-    output_dir = join("/output", build_repo, build_id)
+    repo_stem = join("repos", build_repo, build_tag, build_id)
+    repo_dir = join(build_dir, repo_stem)
 
-    copy(rpms_dir, output_dir)
-    call("createrepo {0}", output_dir)
+    copy(rpms_dir, repo_dir)
+    call("createrepo {0}", repo_dir)
 
-    yum_repo_config = rpm_make_yum_repo_config(build_repo, build_id, build_url)
-    yum_repo_file = join(output_dir, "{0}.repo".format(build_repo))
+    yum_repo_config = rpm_make_yum_repo_config(build_repo, build_tag, build_id, build_url)
+    yum_repo_file = join(repo_dir, "config.txt".format(build_repo))
 
     write(yum_repo_file, yum_repo_config)
 
-    tag_data = rpm_make_tag(spec_file, build_repo, build_id, build_url)
+    # Skip developer test builds
+    if build_id != "0":
+        call("scp -o StrictHostKeyChecking=no -i /root/keys/files.key -r {0} files@{1}:{2}",
+             repo_dir, _file_service_host, repo_stem)
+
+    tag_data = rpm_make_tag(spec_file, build_repo, build_tag, build_id, build_url)
     url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, build_repo, build_tag)
 
     # Skip developer test builds
