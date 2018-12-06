@@ -1,16 +1,5 @@
 from plano import *
 
-def distro_key():
-    fields = read("/etc/system-release-cpe")
-    fields = fields.strip().split(":")
-
-    project, os, version = fields[2:5]
-
-    if project == "centos":
-        os = "el"
-
-    return "{0}{1}".format(os, version)
-
 def git_current_commit(checkout_dir):
     with working_dir(checkout_dir):
         return call_for_stdout("git rev-parse HEAD").strip()
@@ -25,23 +14,6 @@ def git_make_archive(checkout_dir, output_dir, archive_stem):
         call("git archive --output {0} --prefix {1}/ HEAD", output_file, archive_stem)
 
     return output_file
-
-def http_get(url, output_file):
-    call("curl -f -H 'Expect:' {0} -o {1}", url, output_file)
-
-# XXX http_get(url, output_file=None)
-# XXX http_put(url, input)
-# XXX Use json codec directly
-
-def http_get_json(url):
-    with temp_file() as f:
-        http_get(url, f)
-        return read_json(f)
-
-def http_put_json(url, data):
-    with temp_file() as f:
-        write_json(f, data)
-        call("curl -f -X PUT -H 'Expect:' {0} -d @{1}", url, f)
 
 _file_service_host = "192.168.86.27"
 _file_service_url = "http://{0}:7070".format(_file_service_host)
@@ -62,13 +34,21 @@ skip_if_unavailable=1
 # {build_url}
 """
 
-def stagger_get_tag(build_repo, build_tag):
-    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, build_repo, build_tag)
+def stagger_get_tag(repo, tag):
+    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, repo, tag)
     return http_get_json(url)
 
-def stagger_put_tag(build_repo, build_tag, tag_data):
-    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, build_repo, build_tag)
-    http_put_json(url, tag_data)
+def stagger_put_tag(repo, tag, data):
+    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, repo, tag)
+    return http_put_json(url, data)
+
+def stagger_get_artifact(repo, tag, artifact):
+    url = "{0}/api/repos/{1}/tags/{2}/artifacts/{3}".format(_tag_service_url, repo, tag, artifact)
+    return http_get_json(url)
+
+def stagger_put_artifact(repo, tag, artifact, data):
+    url = "{0}/api/repos/{1}/tags/{2}/artifacts/{3}".format(_tag_service_url, repo, tag, artifact)
+    return http_put_json(url, data)
 
 def rpm_make_yum_repo_config(build_repo, build_tag, build_id, build_url):
     file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
@@ -150,7 +130,106 @@ def rpm_publish(spec_file, build_dir, build_repo, build_tag, build_id, build_url
              repo_dir, _file_service_host, repo_stem)
 
     tag_data = rpm_make_tag(spec_file, build_repo, build_tag, build_id, build_url)
-    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, build_repo, build_tag)
+
+    # Skip developer test builds
+    if build_id != "0":
+        stagger_put_tag(build_repo, build_tag, tag_data)
+
+def maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build_url):
+    build_dir = absolute_path(build_dir)
+    repo_dir = join(build_dir, "maven-repository")
+
+    with working_dir(source_dir):
+        records = call_for_stdout("mvn -q -Dmaven.repo.local={0} -Dexec.executable=echo -Dexec.args='${{project.groupId}},${{project.artifactId}},${{project.version}}' exec:exec", repo_dir)
+
+    file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
+    artifacts = dict()
+
+    for record in records.split():
+        group_id, artifact_id, version = record.split(",")
+
+        artifact = {
+            "type": "maven",
+            "repository_url": file_repo_url,
+            "group_id": group_id,
+            "artifact_id": artifact_id,
+            "version": version,
+        }
+
+        artifacts[artifact_id] = artifact
+
+    # commit_id, commit_url
+    tag = {
+        "build_id": build_id,
+        "build_url": build_url,
+        "artifacts": artifacts,
+    }
+
+    return tag
+
+# mvn versions:use-dep-version -Dincludes=junit:junit -DdepVersion=1.0 -DforceVersion=true
+
+def maven_build(source_dir, build_dir, build_id, repo_urls=[], properties={}):
+    repo_dir = absolute_path(join(build_dir, "maven-repository"))
+    settings_file = _make_settings_file(repo_urls)
+
+    with working_dir(source_dir):
+        commit = git_current_commit(".")
+        version = call_for_stdout("mvn -q -Dexec.executable=echo -Dexec.args='${{project.version}}' --non-recursive exec:exec")
+        version = version.strip()
+        version = version.replace("SNAPSHOT", "{0}.{1}".format(build_id, commit[:8]))
+
+        call("mvn versions:set -DnewVersion={0}", version)
+
+        options = [
+            "-U",
+            "-DskipTests",
+            "-Dmaven.repo.local={0}".format(repo_dir),
+            "-gs", settings_file,
+        ]
+
+        for name, value in properties.items():
+            options.append("-D{0}={1}".format(name, value))
+
+        call("mvn {0} install", " ".join(options))
+
+def _make_settings_file(repo_urls):
+    repos = list()
+
+    for i, url in enumerate(repo_urls):
+        repos.append("<repository><id>repo-{0}</id><url>{1}</url></repository>".format(i, url))
+
+    repos = "".join(repos)
+
+    xml = """
+    <settings>
+      <profiles>
+        <profile>
+          <id>main</id>
+          <repositories>
+            {repos}
+          </repositories>
+        </profile>
+      </profiles>
+      <activeProfiles>
+        <activeProfile>main</activeProfile>
+      </activeProfiles>
+    </settings>
+    """
+
+    xml = xml.strip().format(**locals())
+
+    return write(make_temp_file(), xml)
+
+# Requires /root/keys/files.key
+def maven_publish(source_dir, build_dir, build_repo, build_tag, build_id, build_url):
+    repo_stem = join("repos", build_repo, build_tag, build_id)
+
+    if build_id != "0":
+        call("scp -o StrictHostKeyChecking=no -i /root/keys/files.key -r {0} files@{1}:{2}",
+             build_dir, _file_service_host, repo_stem)
+
+    tag_data = maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build_url)
 
     # Skip developer test builds
     if build_id != "0":
