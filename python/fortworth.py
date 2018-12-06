@@ -142,7 +142,7 @@ def maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build
     with working_dir(source_dir):
         records = call_for_stdout("mvn -q -Dmaven.repo.local={0} -Dexec.executable=echo -Dexec.args='${{project.groupId}},${{project.artifactId}},${{project.version}}' exec:exec", repo_dir)
 
-    file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
+    file_repo_url = "{0}/{1}/{2}/{3}/maven-repository".format(_file_service_url, build_repo, build_tag, build_id)
     artifacts = dict()
 
     for record in records.split():
