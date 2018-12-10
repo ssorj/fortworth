@@ -1,20 +1,5 @@
 from plano import *
 
-def git_current_commit(checkout_dir):
-    with working_dir(checkout_dir):
-        return call_for_stdout("git rev-parse HEAD").strip()
-
-def git_make_archive(checkout_dir, output_dir, archive_stem):
-    output_dir = absolute_path(output_dir)
-    output_file = join(output_dir, "{0}.tar.gz".format(archive_stem))
-
-    make_dir(output_dir)
-
-    with working_dir(checkout_dir):
-        call("git archive --output {0} --prefix {1}/ HEAD", output_file, archive_stem)
-
-    return output_file
-
 _file_service_host = "192.168.86.27"
 _file_service_url = "http://{0}:7070".format(_file_service_host)
 _tag_service_url = "http://192.168.86.27:9090"
@@ -34,21 +19,48 @@ skip_if_unavailable=1
 # {build_url}
 """
 
-def stagger_get_tag(repo, tag):
-    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, repo, tag)
+def git_current_commit(checkout_dir):
+    with working_dir(checkout_dir):
+        return call_for_stdout("git rev-parse HEAD").strip()
+
+def git_current_branch(checkout_dir):
+    with working_dir(checkout_dir):
+        return call_for_stdout("git rev-parse --abbrev-ref HEAD").strip()
+
+def git_make_archive(checkout_dir, output_dir, archive_stem):
+    output_dir = absolute_path(output_dir)
+    output_file = join(output_dir, "{0}.tar.gz".format(archive_stem))
+
+    make_dir(output_dir)
+
+    with working_dir(checkout_dir):
+        call("git archive --output {0} --prefix {1}/ HEAD", output_file, archive_stem)
+
+    return output_file
+
+def stagger_get_tag(repo, branch, tag):
+    url = "{0}/api/repos/{1}/branches/{2}/tags/{3}".format(_tag_service_url, repo, branch, tag)
     return http_get_json(url)
 
-def stagger_put_tag(repo, tag, data):
-    url = "{0}/api/repos/{1}/tags/{2}".format(_tag_service_url, repo, tag)
-    return http_put_json(url, data)
+def stagger_put_tag(repo, branch, tag, tag_data):
+    url = "{0}/api/repos/{1}/branches/{2}/tags/{3}".format(_tag_service_url, repo, branch, tag)
+    return http_put_json(url, tag_data)
 
-def stagger_get_artifact(repo, tag, artifact):
-    url = "{0}/api/repos/{1}/tags/{2}/artifacts/{3}".format(_tag_service_url, repo, tag, artifact)
+def stagger_get_artifact(repo, branch, tag, artifact):
+    url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(_tag_service_url, repo, branch, tag, artifact)
     return http_get_json(url)
 
-def stagger_put_artifact(repo, tag, artifact, data):
-    url = "{0}/api/repos/{1}/tags/{2}/artifacts/{3}".format(_tag_service_url, repo, tag, artifact)
-    return http_put_json(url, data)
+def stagger_put_artifact(repo, branch, tag, artifact, artifact_data):
+    url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(_tag_service_url, repo, branch, tag, artifact)
+    return http_put_json(url, artifact_data)
+
+# Requires /root/keys/files.key be present inside the container
+def store_build(build_dir, repo, branch, build_id):
+    options = "-o StrictHostKeyChecking=no -i /root/keys/files.key"
+    remote_dir = join("repos", repo, branch, build_id)
+
+    call("ssh {0} files@{1} 'rm -f {2}; mkdir -p {2}'", options, _file_service_host, parent_dir(remote_dir))
+    call("scp {0} -r {1} files@{2}:{3}", options, build_dir, _file_service_host, remote_dir)
 
 def rpm_make_yum_repo_config(build_repo, build_tag, build_id, build_url):
     file_repo_url = "{0}/{1}/{2}/{3}".format(_file_service_url, build_repo, build_tag, build_id)
@@ -110,7 +122,6 @@ def rpm_build(spec_file, source_dir, build_dir, build_id):
 
     call("rpmbuild -D '_topdir {0}' -ba {1}", absolute_path(build_dir), spec_file)
 
-# Requires /root/keys/files.key
 def rpm_publish(spec_file, build_dir, build_repo, build_tag, build_id, build_url):
     rpms_dir = join(build_dir, "RPMS")
     repo_stem = join("repos", build_repo, build_tag, build_id)
@@ -124,33 +135,28 @@ def rpm_publish(spec_file, build_dir, build_repo, build_tag, build_id, build_url
 
     write(yum_repo_file, yum_repo_config)
 
-    # Skip developer test builds
-    if build_id != "0":
-        call("scp -o StrictHostKeyChecking=no -i /root/keys/files.key -r {0} files@{1}:{2}",
-             repo_dir, _file_service_host, repo_stem)
-
     tag_data = rpm_make_tag(spec_file, build_repo, build_tag, build_id, build_url)
 
     # Skip developer test builds
     if build_id != "0":
+        copy_artifacts(repo_dir, repo_stem)
         stagger_put_tag(build_repo, build_tag, tag_data)
 
-def maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build_url):
-    build_dir = absolute_path(build_dir)
-    repo_dir = join(build_dir, "maven-repository")
+def maven_make_tag_data(source_dir, build_dir, repo, branch, build_id, build_url=None, commit_id=None):
+    repo_dir = absolute_path(join(build_dir, "maven-repository"))
+    files_url = "{0}/{1}/{2}/{3}".format(_file_service_url, repo, branch, build_id)
+    maven_repo_url = "{0}/maven-repository".format(files_url)
+    artifacts = dict()
 
     with working_dir(source_dir):
         records = call_for_stdout("mvn -q -Dmaven.repo.local={0} -Dexec.executable=echo -Dexec.args='${{project.groupId}},${{project.artifactId}},${{project.version}}' exec:exec", repo_dir)
-
-    file_repo_url = "{0}/{1}/{2}/{3}/maven-repository".format(_file_service_url, build_repo, build_tag, build_id)
-    artifacts = dict()
 
     for record in records.split():
         group_id, artifact_id, version = record.split(",")
 
         artifact = {
             "type": "maven",
-            "repository_url": file_repo_url,
+            "repository_url": maven_repo_url,
             "group_id": group_id,
             "artifact_id": artifact_id,
             "version": version,
@@ -158,18 +164,19 @@ def maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build
 
         artifacts[artifact_id] = artifact
 
-    # commit_id, commit_url
-    tag = {
+    data = {
         "build_id": build_id,
         "build_url": build_url,
+        "commit_id": commit_id,
+        "files_url": files_url,
         "artifacts": artifacts,
     }
 
-    return tag
+    return data
 
 # mvn versions:use-dep-version -Dincludes=junit:junit -DdepVersion=1.0 -DforceVersion=true
 
-def maven_build(source_dir, build_dir, build_id, repo_urls=[], properties={}):
+def maven_build(source_dir, build_dir, repo, branch, tag, build_id, repo_urls=[], properties={}, build_url=None):
     repo_dir = absolute_path(join(build_dir, "maven-repository"))
     settings_file = _make_settings_file(repo_urls)
 
@@ -192,6 +199,16 @@ def maven_build(source_dir, build_dir, build_id, repo_urls=[], properties={}):
             options.append("-D{0}={1}".format(name, value))
 
         call("mvn {0} install", " ".join(options))
+
+    tag_data = maven_make_tag_data(source_dir, build_dir, repo, branch, build_id,
+                                   build_url=build_url, commit_id=commit)
+
+    # Skip developer test builds
+    if build_id is None:
+        return
+
+    store_build(build_dir, repo, branch, build_id)
+    stagger_put_tag(repo, branch, tag, tag_data)
 
 def _make_settings_file(repo_urls):
     repos = list()
@@ -221,16 +238,11 @@ def _make_settings_file(repo_urls):
 
     return write(make_temp_file(), xml)
 
-# Requires /root/keys/files.key
-def maven_publish(source_dir, build_dir, build_repo, build_tag, build_id, build_url):
-    repo_stem = join("repos", build_repo, build_tag, build_id)
-
-    if build_id != "0":
-        call("scp -o StrictHostKeyChecking=no -i /root/keys/files.key -r {0} files@{1}:{2}",
-             build_dir, _file_service_host, repo_stem)
-
-    tag_data = maven_make_tag(source_dir, build_dir, build_repo, build_tag, build_id, build_url)
+def maven_publish(source_dir, build_dir, repo, branch, tag, build_id, build_url=None):
+    tag_data = maven_make_tag_data(source_dir, build_dir, repo, branch, build_id, build_url=build_url)
 
     # Skip developer test builds
-    if build_id != "0":
-        stagger_put_tag(build_repo, build_tag, tag_data)
+    if build_id is None:
+        return
+
+    stagger_put_tag(repo, branch, tag, tag_data)
