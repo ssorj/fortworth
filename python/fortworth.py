@@ -59,7 +59,8 @@ def store_build(build_dir, repo, branch, build_id):
     options = "-o StrictHostKeyChecking=no -i /root/keys/files.key"
     remote_dir = join("repos", repo, branch, build_id)
 
-    call("ssh {0} files@{1} 'rm -f {2}; mkdir -p {2}'", options, _file_service_host, parent_dir(remote_dir))
+    call("ssh {0} files@{1} 'rm -f {2}; mkdir -p {3}'",
+         options, _file_service_host, remote_dir, parent_dir(remote_dir))
     call("scp {0} -r {1} files@{2}:{3}", options, build_dir, _file_service_host, remote_dir)
 
 def rpm_make_yum_repo_config(build_repo, build_tag, build_id, build_url):
