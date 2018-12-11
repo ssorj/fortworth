@@ -4,7 +4,7 @@ _file_service_host = "192.168.86.27"
 _file_service_url = "http://{0}:7070".format(_file_service_host)
 _tag_service_url = "http://192.168.86.27:9090"
 
-_yum_repo_template = """
+_yum_repo_config_template = """
 [{repo}/{branch}/{build_id}]
 name={repo}/{branch}/{build_id}
 baseurl={yum_repo_url}
@@ -63,7 +63,7 @@ def store_build(build_dir, repo, branch, build_id):
 
 def rpm_make_yum_repo_config(repo, branch, build_id):
     yum_repo_url = _yum_repo_url(repo, branch, build_id)
-    return _yum_repo_template.lstrip().format(**locals())
+    return _yum_repo_config_template.lstrip().format(**locals())
 
 def rpm_make_tag_data(spec_file, source_dir, repo, branch, build_id, build_url=None):
     records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file)
@@ -92,15 +92,14 @@ def rpm_make_tag_data(spec_file, source_dir, repo, branch, build_id, build_url=N
 
     return tag
 
-def rpm_install_tag_packages(build_repo, build_tag, *packages):
-    tag_data = stagger_get_tag(build_repo, build_tag)
+def rpm_install_tag_packages(repo, branch, tag, *packages):
+    tag_data = stagger_get_tag(repo, branch, tag)
 
     for package in packages:
         yum_repo_url = tag_data["artifacts"][package]["repository_url"]
         url = "{0}/config.txt".format(yum_repo_url)
 
-        http_get(url, "/etc/yum.repos.d/{0}.repo".format(build_repo))
-
+        http_get(url, output_file="/etc/yum.repos.d/{0}.repo".format(repo))
         call("yum -y install {0}", package)
 
 def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
