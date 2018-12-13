@@ -2,7 +2,7 @@ from plano import *
 
 _file_service_host = "192.168.86.27"
 _file_service_url = "http://{0}:7070".format(_file_service_host)
-_tag_service_url = "http://stagger-rhm.cloud.paas.upshift.redhat.com/"
+_tag_service_url = "http://stagger-rhm.cloud.paas.upshift.redhat.com"
 
 _yum_repo_config_template = """
 [{repo}/{branch}/{build_id}]
