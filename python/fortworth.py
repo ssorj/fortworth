@@ -1,7 +1,11 @@
 from plano import *
 
-_file_service_host = "192.168.86.27"
-_file_service_url = "http://{0}:7070".format(_file_service_host)
+# sudo scp -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -P 32196 -i /root/keys/files.key /home/jross/openshift-notes.md app@files-ssh-rhm.cloud.paas.upshift.redhat.com:web/
+
+_file_service_ssh_host = "files-ssh-rhm.cloud.paas.upshift.redhat.com"
+_file_service_ssh_port = 32196
+
+_file_service_url = "https://files-http-rhm.cloud.paas.upshift.redhat.com"
 _tag_service_url = "https://stagger-rhm.cloud.paas.upshift.redhat.com"
 
 _yum_repo_config_template = """
@@ -55,11 +59,12 @@ def stagger_put_artifact(repo, branch, tag, artifact, artifact_data):
 # Requires /root/keys/files.key be present inside the container
 def store_build(build_dir, repo, branch, build_id):
     options = "-o StrictHostKeyChecking=no -i /root/keys/files.key"
-    remote_dir = join("repos", repo, branch, build_id)
+    remote_dir = join("web", "builds", repo, branch, build_id)
 
-    call("ssh {0} files@{1} 'rm -rf {2}; mkdir -p {3}'",
-         options, _file_service_host, remote_dir, parent_dir(remote_dir))
-    call("scp {0} -r {1} files@{2}:{3}", options, build_dir, _file_service_host, remote_dir)
+    call("ssh {0} -p {1} app@{2} 'rm -rf {3}; mkdir -p {4}'",
+         options, _file_service_ssh_port, _file_service_ssh_host, remote_dir, parent_dir(remote_dir))
+    call("scp {0} -P {1} -r {2} app@{3}:{4}",
+         options, _file_service_ssh_port, build_dir, _file_service_ssh_host, remote_dir)
 
 def rpm_make_yum_repo_config(repo, branch, build_id):
     yum_repo_url = _yum_repo_url(repo, branch, build_id)
@@ -238,7 +243,7 @@ def maven_publish(source_dir, build_dir, repo, branch, tag, build_id, build_url=
         stagger_put_tag(repo, branch, tag, tag_data)
 
 def _files_url(repo, branch, build_id):
-    return "{0}/{1}/{2}/{3}".format(_file_service_url, repo, branch, build_id)
+    return "{0}/builds/{1}/{2}/{3}".format(_file_service_url, repo, branch, build_id)
 
 def _yum_repo_url(repo, branch, build_id):
     return "{0}/repo".format(_files_url(repo, branch, build_id))
