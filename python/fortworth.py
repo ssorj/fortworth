@@ -1,10 +1,7 @@
 from plano import *
 
-# sudo scp -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -P 32196 -i /root/keys/files.key /home/jross/openshift-notes.md app@files-ssh-rhm.cloud.paas.upshift.redhat.com:web/
-
 _file_service_ssh_host = "files-ssh-rhm.cloud.paas.upshift.redhat.com"
 _file_service_ssh_port = 32196
-
 _file_service_url = "https://files-http-rhm.cloud.paas.upshift.redhat.com"
 _tag_service_url = "https://stagger-rhm.cloud.paas.upshift.redhat.com"
 
@@ -18,7 +15,7 @@ skip_if_unavailable=1
 
 # Yum repo install command:
 #
-# curl {yum_repo_url}/config.txt -o /etc/yum.repos.d/{repo}.repo
+# sudo curl {yum_repo_url}/config.txt -o /etc/yum.repos.d/{repo}.repo
 """
 
 def git_current_commit(checkout_dir):
@@ -58,7 +55,7 @@ def stagger_put_artifact(repo, branch, tag, artifact, artifact_data):
 
 # Requires /root/keys/files.key be present inside the container
 def store_build(build_dir, repo, branch, build_id):
-    options = "-o StrictHostKeyChecking=no -i /root/keys/files.key"
+    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/keys/files.key"
     remote_dir = join("web", "builds", repo, branch, build_id)
 
     call("ssh {0} -p {1} app@{2} 'rm -rf {3}; mkdir -p {4}'",
