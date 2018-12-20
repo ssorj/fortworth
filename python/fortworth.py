@@ -53,9 +53,9 @@ def stagger_put_artifact(repo, branch, tag, artifact, artifact_data):
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(_tag_service_url, repo, branch, tag, artifact)
     return http_put_json(url, artifact_data)
 
-# Requires /root/.ssh/files be present inside the container
+# Requires /root/.ssh/id_rsa_file_service be present inside the container
 def store_build(build_dir, repo, branch, build_id):
-    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/.ssh/files"
+    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa_file_service"
     remote_dir = join("web", "builds", repo, branch, build_id)
 
     call("ssh {0} -p {1} app@{2} 'rm -rf {3}; mkdir -p {4}'",
