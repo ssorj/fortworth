@@ -39,23 +39,23 @@ def git_make_archive(checkout_dir, output_dir, archive_stem):
 
 def stagger_get_tag(repo, branch, tag):
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}".format(_tag_service_url, repo, branch, tag)
-    return http_get_json(url, insecure=True)
+    return http_get_json(url)
 
 def stagger_put_tag(repo, branch, tag, tag_data):
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}".format(_tag_service_url, repo, branch, tag)
-    return http_put_json(url, tag_data, insecure=True)
+    return http_put_json(url, tag_data)
 
 def stagger_get_artifact(repo, branch, tag, artifact):
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(_tag_service_url, repo, branch, tag, artifact)
-    return http_get_json(url, insecure=True)
+    return http_get_json(url)
 
 def stagger_put_artifact(repo, branch, tag, artifact, artifact_data):
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(_tag_service_url, repo, branch, tag, artifact)
-    return http_put_json(url, artifact_data, insecure=True)
+    return http_put_json(url, artifact_data)
 
-# Requires /root/keys/files.key be present inside the container
+# Requires /root/.ssh/files be present inside the container
 def store_build(build_dir, repo, branch, build_id):
-    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/keys/files.key"
+    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/.ssh/files"
     remote_dir = join("web", "builds", repo, branch, build_id)
 
     call("ssh {0} -p {1} app@{2} 'rm -rf {3}; mkdir -p {4}'",
@@ -101,7 +101,7 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
         yum_repo_url = tag_data["artifacts"][package]["repository_url"]
         url = "{0}/config.txt".format(yum_repo_url)
 
-        http_get(url, output_file="/etc/yum.repos.d/{0}.repo".format(repo), insecure=True)
+        http_get(url, output_file="/etc/yum.repos.d/{0}.repo".format(repo))
         call("yum -y install {0}", package)
 
 def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
