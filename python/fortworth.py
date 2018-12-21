@@ -128,7 +128,7 @@ def rpm_build(spec_file, source_dir, build_dir, repo, branch, tag, build_id, bui
     git_make_archive(source_dir, join(build_dir, "SOURCES"), archive_stem)
     call("rpmbuild -D '_topdir {0}' -ba {1}", absolute_path(build_dir), spec_file)
     copy(rpms_dir, yum_repo_dir)
-    call("createrepo {0}", rpms_dir)
+    call("createrepo {0}", yum_repo_dir)
     write(yum_repo_file, yum_repo_config)
 
     tag_data = rpm_make_tag_data(spec_file, source_dir, repo, branch, build_id, build_url=build_url)
