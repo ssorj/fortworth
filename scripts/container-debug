@@ -1,0 +1,29 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+command = ARGS[1]
+base_image = unique_id()
+test_image = unique_id()
+
+call("sudo docker build -t {0} .", base_image)
+
+test_conf = """
+FROM {base_image}
+COPY . /root/project
+WORKDIR /root/project
+""".format(**locals())
+
+with temp_file(dir=".") as f:
+    write(f, test_conf)
+    call("sudo docker build -t {0} -f {1} .", test_image, f)
+
+options = [
+    "--rm",
+    "-v", "/root/.ssh/id_rsa_file_service:/root/.ssh/id_rsa_file_service:ro",
+    "-v", "/etc/pki/ca-trust:/etc/pki/ca-trust:ro",
+    "--security-opt", "label=disable",
+]
+    
+call("sudo docker run -it {0} {1} {2}", " ".join(options), test_image, command)
+call("sudo docker image rm {0} {1}", base_image, test_image)
