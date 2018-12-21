@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+remove("source")
+remove("build")
+remove("scripts/__pycache__")
+
+for file in find("scripts", "*.pyc"):
+    remove(file)

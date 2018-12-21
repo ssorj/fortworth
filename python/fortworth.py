@@ -6,8 +6,8 @@ _file_service_url = "https://files-http-rhm.cloud.paas.upshift.redhat.com"
 _tag_service_url = "https://stagger-rhm.cloud.paas.upshift.redhat.com"
 
 _yum_repo_config_template = """
-[{repo}/{branch}/{build_id}]
-name={repo}/{branch}/{build_id}
+[{repo}-{branch}-{build_id}]
+name={repo}-{branch}-{build_id}
 baseurl={yum_repo_url}
 enabled=1
 gpgcheck=0
@@ -107,6 +107,9 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
 def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
     assert input_spec_file.endswith(".in"), input_spec_file
     assert is_dir(join(source_dir, ".git"))
+
+    if build_id is None:
+        build_id = 0
 
     commit = git_current_commit(source_dir)
     release = "0.{0}.{1}".format(build_id, commit[:8])

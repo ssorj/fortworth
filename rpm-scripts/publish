@@ -1,0 +1,12 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+spec_file = ARGS[1]
+repo = ARGS[2]
+branch = ARGS[3]
+tag = ARGS[4]
+build_id = ENV.get("BUILD_NUMBER")
+build_url = ENV.get("BUILD_URL")
+
+rpm_publish(spec_file, "source", repo, branch, tag, build_id, build_url=build_url)

@@ -1,0 +1,9 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+input_spec_file = ARGS[1]
+output_spec_file = ARGS[2]
+build_id = ENV.get("BUILD_NUMBER")
+
+rpm_configure(input_spec_file, output_spec_file, "source", build_id)

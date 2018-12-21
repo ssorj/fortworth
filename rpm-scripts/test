@@ -1,0 +1,9 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+rpms = find("build/RPMS", "*.rpm")
+
+assert rpms
+
+call("yum -y install {0}", " ".join(rpms))
