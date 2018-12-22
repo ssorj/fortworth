@@ -26,4 +26,4 @@ options = [
 ]
     
 call("sudo docker run -it {0} {1} {2}", " ".join(options), test_image, command)
-call("sudo docker image rm {0} {1}", base_image, test_image)
+call("sudo docker image rm --no-prune {0} {1}", base_image, test_image)
