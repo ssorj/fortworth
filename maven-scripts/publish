@@ -1,0 +1,11 @@
+#!/usr/bin/python
+
+from fortworth import *
+
+repo = ARGS[1]
+branch = ARGS[2]
+tag = ARGS[3]
+build_id = ENV.get("BUILD_NUMBER")
+build_url = ENV.get("BUILD_URL")
+
+maven_publish("source", "build", repo, branch, tag, build_id, build_url=build_url)
