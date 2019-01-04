@@ -119,8 +119,8 @@ def rpm_build(spec_file, source_dir, build_dir, build_data):
     records = call_for_stdout("rpm -q --qf '%{{name}}-%{{version}}\n' --specfile {0}", spec_file)
     archive_stem = records.split()[0]
     rpms_dir = join(build_dir, "RPMS")
-    output_dir = make_temp_dir()
-    yum_repo_dir = join(output_dir, "repo")
+    dist_dir = make_dir(build_dir, "dist")
+    yum_repo_dir = join(dist_dir, "repo")
     yum_repo_config = rpm_make_yum_repo_config(build_data)
     yum_repo_file = join(yum_repo_dir, "config.txt")
 
@@ -136,7 +136,7 @@ def rpm_publish(spec_file, source_dir, build_dir, build_data, tag):
         return
 
     if not build_is_stored(build_data):
-        store_build(build_dir, build_data)
+        store_build(join(build_dir, "dist"), build_data)
 
     tag_data = _rpm_make_tag_data(spec_file, source_dir, build_data)
 
