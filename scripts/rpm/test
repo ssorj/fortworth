@@ -2,6 +2,9 @@
 
 from fortworth import *
 
+repo = ARGS[1]
+branch = ARGS[2]
+
 rpms = find("build/RPMS", "*.rpm")
 
 assert rpms
