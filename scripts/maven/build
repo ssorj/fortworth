@@ -4,8 +4,9 @@ from fortworth import *
 
 repo = ARGS[1]
 branch = ARGS[2]
-tag = ARGS[3]
 build_id = ENV.get("BUILD_NUMBER")
 build_url = ENV.get("BUILD_URL")
 
-maven_build("source", "build", repo, branch, tag, build_id, build_url=build_url)
+build_data = BuildData(repo, branch, build_id, build_url)
+
+maven_build("source", "build", build_data)

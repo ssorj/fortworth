@@ -2,7 +2,7 @@
 
 from fortworth import *
 
-command = ARGS[1]
+command = " ".join(ARGS[1:])
 base_image = unique_id()
 test_image = unique_id()
 
