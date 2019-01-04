@@ -103,11 +103,9 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
         http_get(url, output_file="/etc/yum.repos.d/{0}.repo".format(repo))
         call("yum -y install {0}", package)
 
-def rpm_configure(input_spec_file, output_spec_file, source_dir, build_data):
+def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
     assert input_spec_file.endswith(".in"), input_spec_file
     assert is_dir(join(source_dir, ".git"))
-
-    build_id = build_data.id
 
     if build_id is None:
         build_id = 0
