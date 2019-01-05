@@ -9,4 +9,4 @@ rpms = find("build/RPMS", "*.rpm")
 
 assert rpms
 
-call("yum -y install {0}", " ".join(rpms))
+call("sudo yum -y install {0}", " ".join(rpms))

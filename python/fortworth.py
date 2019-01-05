@@ -75,9 +75,9 @@ def build_is_stored(build_data):
 
     return True
 
-# Requires /root/.ssh/id_rsa_file_service be present inside the container
+# Requires /id_rsa_file_service be present inside the container
 def store_build(build_dir, build_data):
-    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa_file_service"
+    options = "-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /id_rsa_file_service"
     remote_dir = join("web", "builds", build_data.repo, build_data.branch, build_data.id)
 
     call("ssh {0} -p {1} app@{2} 'rm -rf {3}; mkdir -p {4}'",
