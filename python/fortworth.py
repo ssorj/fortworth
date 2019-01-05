@@ -100,8 +100,11 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
         yum_repo_url = tag_data["artifacts"][package]["repository_url"]
         url = "{0}/config.txt".format(yum_repo_url)
 
-        http_get(url, output_file="/etc/yum.repos.d/{0}.repo".format(repo))
-        call("yum -y install {0}", package)
+        with temp_file() as f:
+            http_get(url, output_file=f)
+            call("sudo cp {0} {1}", f, "/etc/yum.repos.d/{0}.repo".format(repo))
+
+        call("sudo yum -y install {0}", package)
 
 def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
     assert input_spec_file.endswith(".in"), input_spec_file
