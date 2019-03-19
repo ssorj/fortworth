@@ -85,6 +85,14 @@ def store_build(build_dir, build_data):
     call("scp {0} -P {1} -r {2} app@{3}:{4}",
          options, _file_service_ssh_port, build_dir, _file_service_ssh_host, remote_dir)
 
+    for i in range(30):
+        sleep(3)
+
+        if build_is_stored(build_data):
+            break
+    else:
+        fail("Timed out waiting for the build to appear in storage")
+
 def rpm_make_yum_repo_config(build_data):
     repo = build_data.repo
     branch = build_data.branch
