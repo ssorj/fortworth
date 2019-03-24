@@ -2,7 +2,6 @@
 
 from fortworth import *
 
-remove("source")
 remove("build")
 remove("scripts/__pycache__")
 
