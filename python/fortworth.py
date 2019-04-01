@@ -45,13 +45,13 @@ def git_current_commit_url(checkout_dir):
     if source_url.startswith("https://github.com/"):
         try:
             party, repo = source_url[19:].split("/", 1)
-
-            if repo.endswith(".git"):
-                repo = repo[0:-4]
-
-            return "https://github.com/{0}/{1}/{2}".format(party, repo, commit)
         except IndexError:
-            pass
+            return
+
+        if repo.endswith(".git"):
+            repo = repo[0:-4]
+
+        return "https://github.com/{0}/{1}/commit/{2}".format(party, repo, commit)
 
 def git_current_branch(checkout_dir):
     with working_dir(checkout_dir):
