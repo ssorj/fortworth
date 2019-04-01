@@ -30,9 +30,24 @@ class BuildData(object):
         self.id = id
         self.url = url
 
+def git_current_source_url(checkout_dir):
+    with working_dir(checkout_dir):
+        return call_for_stdout("git remote get-url origin").strip()
+
 def git_current_commit(checkout_dir):
     with working_dir(checkout_dir):
         return call_for_stdout("git rev-parse HEAD").strip()
+
+def git_current_commit_url(checkout_dir):
+    source_url = git_current_source_url(checkout_dir)
+    commit = git_current_commit(checkout_dir)
+
+    if source_url.startswith("https://github.com/"):
+        try:
+            party, repo = url[19:].split("/", 1)
+            return "https://github.com/{0}/{1}/{2}".format(party, repo[0:-4], commit)
+        except IndexError:
+            pass
 
 def git_current_branch(checkout_dir):
     with working_dir(checkout_dir):
@@ -174,6 +189,7 @@ def _rpm_make_tag_data(spec_file, source_dir, build_data):
         "build_id": build_data.id,
         "build_url": build_data.url,
         "commit_id": git_current_commit(source_dir),
+        "commit_url": git_current_commit_url(source_dir),
         "artifacts": artifacts,
     }
 
@@ -270,6 +286,7 @@ def _maven_make_tag_data(source_dir, build_dir, build_data):
         "build_id": build_data.id,
         "build_url": build_data.url,
         "commit_id": git_current_commit(source_dir),
+        "commit_url": git_current_commit_url(source_dir),
         "artifacts": artifacts,
     }
 
