@@ -32,7 +32,7 @@ class BuildData(object):
 
 def git_current_source_url(checkout_dir):
     with working_dir(checkout_dir):
-        return call_for_stdout("git ls-remote --get-url").strip()
+        return call_for_stdout("git config --get remote.origin.url").strip()
 
 def git_current_commit(checkout_dir):
     with working_dir(checkout_dir):
