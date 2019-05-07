@@ -119,7 +119,7 @@ def stagger_put_artifact(repo, branch, tag, artifact, artifact_data, service_url
     return response.text
 
 def bodega_put_build(build_dir, build_data, service_url=_bodega_url):
-    build_url = _build_url(build_data, service_url=service_url)
+    build_url = bodega_build_url(build_data, service_url=service_url)
     session = _requests.Session()
 
     for fs_path in find(build_dir):
@@ -134,11 +134,15 @@ def bodega_put_build(build_dir, build_data, service_url=_bodega_url):
             response.raise_for_status()
 
 def bodega_build_exists(build_data, service_url=_bodega_url):
-    build_url = _build_url(build_data, service_url=service_url)
+    build_url = bodega_build_url(build_data, service_url=service_url)
 
     response = _requests.get(build_url)
 
     return response.status_code == _requests.codes.ok
+
+def bodega_build_url(build_data, service_url=_bodega_url):
+    assert service_url
+    return "{0}/{1}/{2}/{3}".format(service_url, build_data.repo, build_data.branch, build_data.id)
 
 def rpm_make_yum_repo_config(build_data):
     repo = build_data.repo
@@ -324,14 +328,10 @@ def _maven_make_tag_data(source_dir, build_dir, build_data):
 
     return data
 
-def _build_url(build_data, service_url=_bodega_url):
-    assert service_url
-    return "{0}/{1}/{2}/{3}".format(service_url, build_data.repo, build_data.branch, build_data.id)
-
 def _yum_repo_url(build_data, service_url=_bodega_url):
     assert service_url
-    return "{0}/repo".format(_build_url(build_data, service_url=service_url))
+    return "{0}/repo".format(bodega_build_url(build_data, service_url=service_url))
 
 def _maven_repo_url(build_data, service_url=_bodega_url):
     assert service_url
-    return "{0}/repo".format(_build_url(build_data, service_url=service_url))
+    return "{0}/repo".format(bodega_build_url(build_data, service_url=service_url))
