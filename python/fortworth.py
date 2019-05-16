@@ -165,7 +165,7 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
 
         call("sudo yum -y install {0}", package)
 
-def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
+def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **substitutions):
     assert input_spec_file.endswith(".in"), input_spec_file
     assert is_dir(join(source_dir, ".git"))
 
@@ -175,7 +175,7 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id):
     commit = git_current_commit(source_dir)
     release = "0.{0}.{1}".format(build_id, commit[:8])
 
-    configure_file(input_spec_file, output_spec_file, release=release)
+    configure_file(input_spec_file, output_spec_file, release=release, **substitutions)
 
 def rpm_build(spec_file, source_dir, build_dir, build_data):
     records = call_for_stdout("rpm -q --qf '%{{name}}-%{{version}}\n' --specfile {0}", spec_file)
