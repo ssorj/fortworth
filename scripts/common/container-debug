@@ -3,8 +3,8 @@
 from fortworth import *
 
 command = " ".join(ARGS[1:])
-base_image = unique_id()
-test_image = unique_id()
+base_image = get_unique_id()
+test_image = get_unique_id()
 
 call("sudo docker build -t {0} .", base_image)
 

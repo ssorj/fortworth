@@ -58,7 +58,7 @@ def git_current_branch(checkout_dir):
         return call_for_stdout("git rev-parse --abbrev-ref HEAD").strip()
 
 def git_make_archive(checkout_dir, output_dir, archive_stem):
-    output_dir = absolute_path(output_dir)
+    output_dir = get_absolute_path(output_dir)
     output_file = join(output_dir, "{0}.tar.gz".format(archive_stem))
 
     make_dir(output_dir)
@@ -187,7 +187,7 @@ def rpm_build(spec_file, source_dir, build_dir, build_data):
     yum_repo_file = join(yum_repo_dir, "config.txt")
 
     git_make_archive(source_dir, join(build_dir, "SOURCES"), archive_stem)
-    call("rpmbuild -D '_topdir {0}' -ba {1}", absolute_path(build_dir), spec_file)
+    call("rpmbuild -D '_topdir {0}' -ba {1}", get_absolute_path(build_dir), spec_file)
     copy(rpms_dir, yum_repo_dir)
     call("createrepo {0}", yum_repo_dir)
     write(yum_repo_file, yum_repo_config)
@@ -234,7 +234,7 @@ def _rpm_make_tag_data(spec_file, source_dir, build_data):
 # mvn versions:use-dep-version -Dincludes=junit:junit -DdepVersion=1.0 -DforceVersion=true
 
 def maven_build(source_dir, build_dir, build_data, repo_urls=[], properties={}):
-    maven_repo_dir = absolute_path(join(build_dir, "repo"))
+    maven_repo_dir = get_absolute_path(join(build_dir, "repo"))
     settings_file = _make_settings_file(repo_urls)
 
     with working_dir(source_dir):
@@ -298,7 +298,7 @@ def maven_publish(source_dir, build_dir, build_data, tag):
     stagger_put_tag(build_data.repo, build_data.branch, tag, tag_data)
 
 def _maven_make_tag_data(source_dir, build_dir, build_data):
-    maven_repo_dir = absolute_path(join(build_dir, "repo"))
+    maven_repo_dir = get_absolute_path(join(build_dir, "repo"))
     artifacts = dict()
 
     with working_dir(source_dir):
