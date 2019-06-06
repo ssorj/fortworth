@@ -20,7 +20,6 @@ with temp_file(dir=".") as f:
 
 options = [
     "--rm",
-    "-v", "/root/.ssh/id_rsa_file_service:/root/.ssh/id_rsa_file_service:ro",
     "-v", "/etc/pki/ca-trust:/etc/pki/ca-trust:ro",
     "--security-opt", "label=disable",
 ]
