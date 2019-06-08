@@ -23,6 +23,6 @@ options = [
     "-v", "/etc/pki/ca-trust:/etc/pki/ca-trust:ro",
     "--security-opt", "label=disable",
 ]
-    
+
 call("sudo docker run -it {0} {1} {2}", " ".join(options), test_image, command)
 call("sudo docker image rm --no-prune {0} {1}", base_image, test_image)
