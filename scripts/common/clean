@@ -3,6 +3,7 @@
 from fortworth import *
 
 remove("build")
+remove("source")
 remove("scripts/__pycache__")
 
 for file in find("scripts", "*.pyc"):
