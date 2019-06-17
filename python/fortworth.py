@@ -88,10 +88,13 @@ def stagger_get_tag(repo, branch, tag, service_url=_stagger_http_url):
 
     return response.json()
 
-def stagger_put_tag(repo, branch, tag, tag_data, service_url=_stagger_http_url):
+def stagger_put_tag(repo, branch, tag, tag_data, service_url=_stagger_http_url, dry_run=False):
     assert service_url
 
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}".format(service_url, repo, branch, tag)
+
+    if dry_run:
+        url += "?dry-run=1"
 
     response = _requests.put(url, json=tag_data)
     response.raise_for_status()
@@ -108,10 +111,13 @@ def stagger_get_artifact(repo, branch, tag, artifact, service_url=_stagger_http_
 
     return response.json()
 
-def stagger_put_artifact(repo, branch, tag, artifact, artifact_data, service_url=_stagger_http_url):
+def stagger_put_artifact(repo, branch, tag, artifact, artifact_data, service_url=_stagger_http_url, dry_run=False):
     assert service_url
 
     url = "{0}/api/repos/{1}/branches/{2}/tags/{3}/artifacts/{4}".format(service_url, repo, branch, tag, artifact)
+
+    if dry_run:
+        url += "?dry-run=1"
 
     response = _requests.put(url, json=artifact_data)
     response.raise_for_status()
@@ -128,6 +134,9 @@ def bodega_put_build(build_dir, build_data, service_url=_bodega_url):
 
         relative_path = fs_path[len(build_dir) + 1:]
         request_url = "{0}/{1}".format(build_url, relative_path)
+
+        if build_data.id is None:
+            request_url += "?dry-run=1"
 
         with open(fs_path, "rb") as f:
             response = session.put(request_url, data=f)
