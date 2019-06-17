@@ -9,6 +9,6 @@ tag = ARGS[4]
 build_id = ENV.get("BUILD_NUMBER")
 build_url = ENV.get("BUILD_URL")
 
-build_data = BuildData(repo, branch, build_id, build_url)
+build_info = BuildInfo(repo, branch, build_id, build_url)
 
-rpm_publish(spec_file, "source", "build", build_data, tag)
+rpm_publish(spec_file, "source", "build", build_info, tag)

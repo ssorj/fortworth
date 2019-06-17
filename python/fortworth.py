@@ -34,7 +34,7 @@ def git_get_source_url(checkout_dir):
     with working_dir(checkout_dir):
         return call_for_stdout("git config --get remote.origin.url").strip()
 
-def git_get_commit(checkout_dir):
+def git_get_commit_id(checkout_dir):
     with working_dir(checkout_dir):
         return call_for_stdout("git rev-parse HEAD").strip()
 
@@ -42,7 +42,7 @@ def git_get_commit_url(checkout_dir, commit=None):
     source_url = git_get_source_url(checkout_dir)
 
     if commit is None:
-        commit = git_get_commit(checkout_dir)
+        commit = git_get_commit_id(checkout_dir)
 
     if source_url.startswith("https://github.com/"):
         try:
@@ -183,7 +183,7 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **sub
     if build_id is None:
         build_id = 0
 
-    commit = git_current_commit(source_dir)
+    commit = git_get_commit_id(source_dir)
     release = "0.{0}.{1}".format(build_id, commit[:8])
 
     configure_file(input_spec_file, output_spec_file, release=release, **substitutions)
@@ -235,8 +235,8 @@ def _rpm_make_tag_data(spec_file, source_dir, build_info):
     tag = {
         "build_id": build_info.id,
         "build_url": build_info.url,
-        "commit_id": git_current_commit(source_dir),
-        "commit_url": git_current_commit_url(source_dir),
+        "commit_id": git_get_commit_id(source_dir),
+        "commit_url": git_get_commit_url(source_dir),
         "artifacts": artifacts,
     }
 
@@ -249,7 +249,7 @@ def maven_build(source_dir, build_dir, build_info, repo_urls=[], properties={}):
     settings_file = _make_settings_file(repo_urls)
 
     with working_dir(source_dir):
-        commit_id = git_current_commit(".")
+        commit_id = git_get_commit_id(".")
         version = call_for_stdout("mvn {0} -Dexec.executable=echo -Dexec.args='${{project.version}}' --non-recursive exec:exec", _global_maven_options)
         version = version.strip()
         version = version.replace("SNAPSHOT", "{0}.{1}".format(build_info.id, commit_id[:8]))
@@ -332,8 +332,8 @@ def _maven_make_tag_data(source_dir, build_dir, build_info):
     data = {
         "build_id": build_info.id,
         "build_url": build_info.url,
-        "commit_id": git_current_commit(source_dir),
-        "commit_url": git_current_commit_url(source_dir),
+        "commit_id": git_get_commit_id(source_dir),
+        "commit_url": git_get_commit_url(source_dir),
         "artifacts": artifacts,
     }
 

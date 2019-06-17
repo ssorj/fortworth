@@ -7,6 +7,6 @@ branch = ARGS[2]
 build_id = ENV.get("BUILD_NUMBER")
 build_url = ENV.get("BUILD_URL")
 
-build_data = BuildData(repo, branch, build_id, build_url)
+build_info = BuildInfo(repo, branch, build_id, build_url)
 
-maven_build("source", "build", build_data)
+maven_build("source", "build", build_info)
