@@ -191,6 +191,7 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **sub
 def rpm_build(spec_file, source_dir, build_dir, build_info):
     records = call_for_stdout("rpm -q --qf '%{{name}}-%{{version}}\n' --specfile {0}", spec_file)
     archive_stem = records.split()[0]
+    srpms_dir = join(build_dir, "SRPMS")
     rpms_dir = join(build_dir, "RPMS")
     dist_dir = make_dir(join(build_dir, "dist"))
     yum_repo_dir = join(dist_dir, "repo")
@@ -199,6 +200,7 @@ def rpm_build(spec_file, source_dir, build_dir, build_info):
 
     git_make_archive(source_dir, join(build_dir, "SOURCES"), archive_stem)
     call("rpmbuild -D '_topdir {0}' -ba {1}", get_absolute_path(build_dir), spec_file)
+    copy(srpms_dir, join(dist_dir, "srpms"))
     copy(rpms_dir, yum_repo_dir)
     call("createrepo {0}", yum_repo_dir)
     write(yum_repo_file, yum_repo_config)
@@ -211,13 +213,24 @@ def rpm_publish(spec_file, source_dir, build_dir, build_info, tag):
     if not bodega_build_exists(build_info):
         bodega_put_build(join(build_dir, "dist"), build_info)
 
-    tag_data = _rpm_make_tag_data(spec_file, source_dir, build_info)
+    tag_data = _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info)
 
     stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data)
 
-def _rpm_make_tag_data(spec_file, source_dir, build_info):
-    records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file)
+def _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info):
     artifacts = dict()
+    srpms_dir = join(build_dir, "dist", "srpms")
+
+    for file_name in list_dir(srpms_dir):
+        nvr_name = call_for_stdout("rpm -qp --qf '%{{name}}' {0}", join(srpms_dir, file_name))
+        artifact_name = "{0}.src.rpm".format(nvr_name)
+
+        artifacts[artifact_name] = {
+            "type": "file",
+            "url": "{0}/srpms/{1}".format(bodega_build_url(build_info, service_url=_bodega_url), file_name),
+        }
+
+    records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file)
 
     for record in records.split():
         name, version, release = record.split(",")
