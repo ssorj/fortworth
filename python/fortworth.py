@@ -126,7 +126,7 @@ def stagger_put_artifact(repo, branch, tag, artifact, artifact_data, service_url
 
     return response.text
 
-def bodega_put_build(build_dir, build_info, service_url=_bodega_url):
+def bodega_put_build(build_info, build_dir, service_url=_bodega_url):
     build_url = bodega_build_url(build_info, service_url=service_url)
     session = _requests.Session()
 
@@ -206,16 +206,12 @@ def rpm_build(spec_file, source_dir, build_dir, build_info):
     write(yum_repo_file, yum_repo_config)
 
 def rpm_publish(spec_file, source_dir, build_dir, build_info, tag):
-    # Skip developer test builds
-    if build_info.id is None:
-        return
-
     if not bodega_build_exists(build_info):
-        bodega_put_build(join(build_dir, "dist"), build_info)
+        bodega_put_build(build_info, join(build_dir, "dist"))
 
     tag_data = _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info)
 
-    stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data)
+    stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data, dry_run=(build_info.id is None))
 
 def _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info):
     artifacts = dict()
@@ -310,16 +306,12 @@ def _make_settings_file(repo_urls):
     return write(make_temp_file(), xml)
 
 def maven_publish(source_dir, build_dir, build_info, tag):
-    # Skip developer test builds
-    if build_info.id is None:
-        return
-
     if not bodega_build_exists(build_info):
-        bodega_put_build(build_dir, build_info)
+        bodega_put_build(build_info, build_dir)
 
     tag_data = _maven_make_tag_data(source_dir, build_dir, build_info)
 
-    stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data)
+    stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data, dry_run=(build_info.id is None))
 
 def _maven_make_tag_data(source_dir, build_dir, build_info):
     maven_repo_dir = get_absolute_path(join(build_dir, "repo"))
@@ -354,7 +346,7 @@ def _maven_make_tag_data(source_dir, build_dir, build_info):
 
 def container_publish(source_dir, build_dir, build_info, tag):
     if not bodega_build_exists(build_info):
-        bodega_put_build(build_dir, build_info)
+        bodega_put_build(build_info, build_dir)
 
     tag_data = _container_make_tag_data(source_dir, build_dir, build_info)
 
