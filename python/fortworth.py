@@ -352,6 +352,32 @@ def _maven_make_tag_data(source_dir, build_dir, build_info):
 
     return data
 
+def container_publish(source_dir, build_dir, build_info, tag):
+    if not bodega_build_exists(build_info):
+        bodega_put_build(build_dir, build_info)
+
+    tag_data = _container_make_tag_data(source_dir, build_dir, build_info)
+
+    stagger_put_tag(build_info.repo, build_info.branch, tag, tag_data, dry_run=(build_info.id is None))
+
+def _container_make_tag_data(source_dir, build_dir, build_info):
+    image_data = read_json(join(build_dir, "image.json"))
+
+    data = {
+        "build_id": build_info.id,
+        "build_url": build_info.url,
+        "commit_id": image_data.get("commit_id"),
+        "commit_url": image_data.get("commit_url"),
+        "artifacts": {
+            image_data["artifact_id"]: {
+                "type": "file",
+                "url": "{0}/{1}".format(bodega_build_url(build_info), image_data["file"]),
+            },
+        },
+    }
+
+    return data
+
 def _yum_repo_url(build_info, service_url=_bodega_url):
     assert service_url
     return "{0}/repo".format(bodega_build_url(build_info, service_url=service_url))
