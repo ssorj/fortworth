@@ -6,7 +6,7 @@ command = " ".join(ARGS[1:])
 base_image = get_unique_id()
 test_image = get_unique_id()
 
-call("sudo docker build -t {0} .", base_image)
+call("podman build -t {0} .", base_image)
 
 test_conf = """
 FROM {base_image}
@@ -16,7 +16,7 @@ WORKDIR /root/project
 
 with temp_file(dir=".") as f:
     write(f, test_conf)
-    call("sudo docker build -t {0} -f {1} .", test_image, f)
+    call("podman build -t {0} -f {1} .", test_image, f)
 
 options = [
     "--rm",
@@ -24,5 +24,5 @@ options = [
     "--security-opt", "label=disable",
 ]
 
-call("sudo docker run -it {0} {1} {2}", " ".join(options), test_image, command)
-call("sudo docker image rm --no-prune {0} {1}", base_image, test_image)
+call("podman run -it {0} {1} {2}", " ".join(options), test_image, command)
+call("podman image rm {0} {1}", base_image, test_image)
