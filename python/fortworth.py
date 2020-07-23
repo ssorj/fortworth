@@ -188,7 +188,7 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **sub
 
     configure_file(input_spec_file, output_spec_file, release=release, **substitutions)
 
-def rpm_build(spec_file, source_dir, build_dir, build_info):
+def rpm_build(spec_file, source_dir, build_dir, build_info, target_platform=None):
     records = call_for_stdout("rpm -q --qf '%{{name}}-%{{version}}\n' --specfile {0}", spec_file)
     archive_stem = records.split()[0]
     srpms_dir = join(build_dir, "SRPMS")
@@ -197,9 +197,13 @@ def rpm_build(spec_file, source_dir, build_dir, build_info):
     yum_repo_dir = join(dist_dir, "repo")
     yum_repo_config = rpm_make_yum_repo_config(build_info)
     yum_repo_file = join(yum_repo_dir, "config.txt")
+    target_option = ""
+
+    if target_platform is not None:
+        target_option = "--target {0}".format(target_platform)
 
     git_make_archive(source_dir, join(build_dir, "SOURCES"), archive_stem)
-    call("rpmbuild -D '_topdir {0}' -ba {1}", get_absolute_path(build_dir), spec_file)
+    call("rpmbuild -D '_topdir {0}' -ba {1} {2}", get_absolute_path(build_dir), spec_file, target_option)
     copy(srpms_dir, join(dist_dir, "srpms"))
     copy(rpms_dir, yum_repo_dir)
     call("createrepo {0}", yum_repo_dir)
