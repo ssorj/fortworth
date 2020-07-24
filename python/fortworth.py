@@ -155,6 +155,15 @@ def bodega_build_url(build_info, service_url=_bodega_url):
     assert service_url
     return "{0}/{1}/{2}/{3}".format(service_url, build_info.repo, build_info.branch, build_info.id)
 
+def rpm_get_nvrs(spec_file):
+    records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file).split()
+
+    for record in records:
+        yield record.split(",", 3)
+
+def rpm_get_nvr(spec_file):
+    return next(rpm_get_nvrs(spec_file), None)
+
 def rpm_make_yum_repo_config(build_info):
     repo = build_info.repo
     branch = build_info.branch
@@ -189,8 +198,8 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **sub
     configure_file(input_spec_file, output_spec_file, release=release, **substitutions)
 
 def rpm_build(spec_file, source_dir, build_dir, build_info, target_platform=None):
-    records = call_for_stdout("rpm -q --qf '%{{name}}-%{{version}}\n' --specfile {0}", spec_file)
-    archive_stem = records.split()[0]
+    name, version, release = rpm_get_nvr(spec_file)
+    archive_stem = "{0}-{1}".format(name, version)
     srpms_dir = join(build_dir, "SRPMS")
     rpms_dir = join(build_dir, "RPMS")
     dist_dir = make_dir(join(build_dir, "dist"))
@@ -230,11 +239,7 @@ def _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info):
             "url": "{0}/srpms/{1}".format(bodega_build_url(build_info, service_url=_bodega_url), file_name),
         }
 
-    records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file)
-
-    for record in records.split():
-        name, version, release = record.split(",")
-
+    for name, version, release in rpm_get_nvrs(spec_file):
         artifact = {
             "type": "rpm",
             "repository_url": _yum_repo_url(build_info),
