@@ -9,7 +9,7 @@ docker_command = ENV.get("DOCKER_COMMAND", "sudo docker")
 base_image = get_unique_id()
 test_image = get_unique_id()
 
-call("{0} build -t {1} .", docker_command, base_image)
+run("{0} build -t {1} .".format(docker_command, base_image))
 
 test_conf = """
 FROM {base_image}
@@ -19,7 +19,7 @@ WORKDIR /root/project
 
 with temp_file(dir=".") as f:
     write(f, test_conf)
-    call("{0} build -t {1} -f {2} .", docker_command, test_image, f)
+    run("{0} build -t {1} -f {2} .".format(docker_command, test_image, f))
 
 options = [
     "--rm",
@@ -27,5 +27,5 @@ options = [
     "--security-opt", "label=disable",
 ]
 
-call("{0} run -it {1} {2} {3}", docker_command, " ".join(options), test_image, command)
-call("{0} image rm {1} {2}", docker_command, base_image, test_image)
+run("{0} run -it {1} {2} {3}".format(docker_command, " ".join(options), test_image, command))
+run("{0} image rm {1} {2}".format(docker_command, base_image, test_image))

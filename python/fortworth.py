@@ -1,4 +1,5 @@
 import requests as _requests
+import shutil as _shutil
 
 from plano import *
 
@@ -32,11 +33,11 @@ class BuildInfo(object):
 
 def git_get_source_url(checkout_dir):
     with working_dir(checkout_dir):
-        return call_for_stdout("git config --get remote.origin.url").strip()
+        return call("git config --get remote.origin.url").strip()
 
 def git_get_commit_id(checkout_dir):
     with working_dir(checkout_dir):
-        return call_for_stdout("git rev-parse HEAD").strip()
+        return call("git rev-parse HEAD").strip()
 
 def git_get_commit_url(checkout_dir, commit=None):
     source_url = git_get_source_url(checkout_dir)
@@ -57,7 +58,7 @@ def git_get_commit_url(checkout_dir, commit=None):
 
 def git_get_branch(checkout_dir):
     with working_dir(checkout_dir):
-        return call_for_stdout("git rev-parse --abbrev-ref HEAD").strip()
+        return call("git rev-parse --abbrev-ref HEAD").strip()
 
 def git_make_archive(checkout_dir, output_dir, archive_stem):
     output_dir = get_absolute_path(output_dir)
@@ -66,7 +67,7 @@ def git_make_archive(checkout_dir, output_dir, archive_stem):
     make_dir(output_dir)
 
     with working_dir(checkout_dir):
-        call("git archive --output {0} --prefix {1}/ HEAD", output_file, archive_stem)
+        run("git archive --output {0} --prefix {1}/ HEAD".format(output_file, archive_stem))
 
     return output_file
 
@@ -156,7 +157,7 @@ def bodega_build_url(build_info, service_url=_bodega_url):
     return "{0}/{1}/{2}/{3}".format(service_url, build_info.repo, build_info.branch, build_info.id)
 
 def rpm_get_nvrs(spec_file):
-    records = call_for_stdout("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}", spec_file).split()
+    records = call("rpm -q --qf '%{{name}},%{{version}},%{{release}}\n' --specfile {0}".format(spec_file)).split()
 
     for record in records:
         yield record.split(",", 3)
@@ -181,9 +182,23 @@ def rpm_install_tag_packages(repo, branch, tag, *packages):
 
         with temp_file() as f:
             http_get(url, output_file=f)
-            call("sudo cp {0} {1}", f, "/etc/yum.repos.d/{0}.repo".format(repo))
+            run("sudo cp {0} {1}".format(f, "/etc/yum.repos.d/{0}.repo".format(repo)))
 
-        call("sudo yum -y install {0}", package)
+        run("sudo yum -y install {0}".format(package))
+
+def configure_file(input_file, output_file, substitutions, quiet=False):
+    notice("Configuring '{0}' for output '{1}'", input_file, output_file)
+
+    content = read(input_file)
+
+    for name, value in substitutions.items():
+        content = content.replace("@{0}@".format(name), value)
+
+    write(output_file, content)
+
+    _shutil.copymode(input_file, output_file)
+
+    return output_file
 
 def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **substitutions):
     assert input_spec_file.endswith(".in"), input_spec_file
@@ -193,9 +208,9 @@ def rpm_configure(input_spec_file, output_spec_file, source_dir, build_id, **sub
         build_id = 0
 
     commit = git_get_commit_id(source_dir)
-    release = "0.{0}.{1}".format(build_id, commit[:8])
+    substitutions["release"] = "0.{0}.{1}".format(build_id, commit[:8])
 
-    configure_file(input_spec_file, output_spec_file, release=release, **substitutions)
+    configure_file(input_spec_file, output_spec_file, substitutions)
 
 def rpm_build(spec_file, source_dir, build_dir, build_info, target_platform=None):
     name, version, release = rpm_get_nvr(spec_file)
@@ -212,10 +227,10 @@ def rpm_build(spec_file, source_dir, build_dir, build_info, target_platform=None
         target_option = "--target {0}".format(target_platform)
 
     git_make_archive(source_dir, join(build_dir, "SOURCES"), archive_stem)
-    call("rpmbuild -D '_topdir {0}' -ba {1} {2}", get_absolute_path(build_dir), spec_file, target_option)
+    run("rpmbuild -D '_topdir {0}' -ba {1} {2}".format(get_absolute_path(build_dir), spec_file, target_option))
     copy(srpms_dir, join(dist_dir, "srpms"))
     copy(rpms_dir, yum_repo_dir)
-    call("createrepo {0}", yum_repo_dir)
+    run("createrepo {0}".format(yum_repo_dir))
     write(yum_repo_file, yum_repo_config)
 
 def rpm_publish(spec_file, source_dir, build_dir, build_info, tag):
@@ -231,7 +246,7 @@ def _rpm_make_tag_data(spec_file, source_dir, build_dir, build_info):
     srpms_dir = join(build_dir, "dist", "srpms")
 
     for file_name in list_dir(srpms_dir):
-        nvr_name = call_for_stdout("rpm -qp --qf '%{{name}}' {0}", join(srpms_dir, file_name))
+        nvr_name = call("rpm -qp --qf '%{{name}}' {0}".format(join(srpms_dir, file_name)))
         artifact_name = "{0}.src.rpm".format(nvr_name)
 
         artifacts[artifact_name] = {
@@ -268,11 +283,11 @@ def maven_build(source_dir, build_dir, build_info, repo_urls=[], properties={}):
 
     with working_dir(source_dir):
         commit_id = git_get_commit_id(".")
-        version = call_for_stdout("mvn {0} -Dexec.executable=echo -Dexec.args='${{project.version}}' --non-recursive exec:exec", _global_maven_options)
+        version = call("mvn {0} -Dexec.executable=echo -Dexec.args='${{project.version}}' --non-recursive exec:exec".format(_global_maven_options))
         version = version.strip()
         version = version.replace("SNAPSHOT", "{0}.{1}".format(build_info.id, commit_id[:8]))
 
-        call("mvn {0} -DnewVersion={1} versions:set", _global_maven_options, version)
+        run("mvn {0} -DnewVersion={1} versions:set".format(_global_maven_options, version))
 
         options = [
             "-U",
@@ -284,7 +299,7 @@ def maven_build(source_dir, build_dir, build_info, repo_urls=[], properties={}):
         for name, value in properties.items():
             options.append("-D{0}={1}".format(name, value))
 
-        call("mvn {0} {1} install", _global_maven_options, " ".join(options))
+        run("mvn {0} {1} install".format(_global_maven_options, " ".join(options)))
 
 def _make_settings_file(repo_urls):
     repos = list()
@@ -327,8 +342,8 @@ def _maven_make_tag_data(source_dir, build_dir, build_info):
     artifacts = dict()
 
     with working_dir(source_dir):
-        records = call_for_stdout("mvn {0} -Dmaven.repo.local={1} -Dexec.executable=echo -Dexec.args='${{project.groupId}},${{project.artifactId}},${{project.version}}' exec:exec",
-                                  _global_maven_options, maven_repo_dir)
+        records = call("mvn {0} -Dmaven.repo.local={1} -Dexec.executable=echo -Dexec.args='${{project.groupId}},${{project.artifactId}},${{project.version}}' exec:exec"
+                       .format(_global_maven_options, maven_repo_dir))
 
     for record in records.split():
         group_id, artifact_id, version = record.split(",")
