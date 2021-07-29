@@ -9,7 +9,7 @@ docker_command = ENV.get("DOCKER_COMMAND", "sudo docker")
 base_image = get_unique_id()
 test_image = get_unique_id()
 
-run("{0} build -t {1} .".format(docker_command, base_image))
+run("{0} build --pull -t {1} .".format(docker_command, base_image))
 
 test_conf = """
 FROM {base_image}
